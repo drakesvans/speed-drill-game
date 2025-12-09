@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Drill - Deep Ocean</title>
+    <!-- Tailwind CSS and Tone.js are loaded from CDNs, making this file self-contained -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <script>
+        // Custom Tailwind Configuration for the Dark/Ocean Theme
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'bg-dark': '#1F2937', // Dark Slate Gray
+                        'card-dark': '#374151', // Slightly Lighter Gray
+                        'accent-teal': '#2DD4BF', // Teal-400
+                        'accent-blue': '#60A5FA', // Blue-400
+                        'accent-green': '#10B981', 
+                        'accent-red': '#F87171',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-bg-dark min-h-screen flex flex-col items-center justify-start p-4 md:p-8 font-sans text-gray-100">
+    
+    <div class="w-full max-w-xl text-center">
+        <!-- Header -->
+        <h1 class="text-3xl md:text-4xl font-extrabold text-accent-teal mb-6 tracking-tight">
+            Speed Drill Multiplier
+        </h1>
+
+        <!-- Score and Timer Display -->
+        <div class="flex justify-between items-center bg-card-dark p-4 rounded-xl shadow-lg mb-6 border border-gray-600">
+            <div class="text-left">
+                <p class="text-sm font-medium text-gray-400">SCORE</p>
+                <p id="scoreDisplay" class="text-3xl font-bold text-accent-teal">0</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm font-medium text-gray-400">TIME LEFT</p>
+                <p id="timerDisplay" class="text-3xl font-bold text-accent-blue">--:--</p>
+            </div>
+        </div>
+
+        <!-- Settings and Start/Stop -->
+        <div id="settingsContainer" class="bg-card-dark p-6 rounded-xl shadow-xl mb-6 flex flex-col space-y-4 border border-gray-600">
+            
+            <!-- Drill Type Selection -->
+            <div class="flex flex-col space-y-3 border-b border-gray-600 pb-4">
+                <p class="text-gray-300 font-semibold text-left">Select Drill Type:</p>
+                <div class="flex justify-around bg-gray-600/30 p-2 rounded-xl border border-gray-700">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="radio" name="drillType" value="range" id="drillTypeRange" checked onchange="updateTableLabel()" class="text-accent-teal focus:ring-accent-teal bg-gray-700 border-gray-500">
+                        <span class="text-gray-200 font-medium text-sm sm:text-base">Range (1 to N)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="radio" name="drillType" value="single" id="drillTypeSingle" onchange="updateTableLabel()" class="text-accent-teal focus:ring-accent-teal bg-gray-700 border-gray-500">
+                        <span class="text-gray-200 font-medium text-sm sm:text-base">Single Table Focus</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Table Number Input -->
+            <div class="flex items-center justify-between pt-2">
+                <label id="tableLabel" for="tableNumber" class="text-gray-300 font-medium">Max Table (N):</label>
+                <input type="number" id="tableNumber" value="20" min="1" max="50" class="w-20 p-2 border border-gray-500 rounded-lg text-center font-semibold bg-gray-700 text-white focus:ring-accent-blue focus:border-accent-blue transition">
+            </div>
+
+            <!-- Time Limit Selection -->
+            <div class="flex items-center justify-between">
+                <label for="timeLimit" class="text-gray-300 font-medium">Select Time Limit:</label>
+                <select id="timeLimit" class="w-24 p-2 border border-gray-500 rounded-lg text-center font-semibold bg-gray-700 text-white focus:ring-accent-blue focus:border-accent-blue transition">
+                    <option value="60">1 Minute</option>
+                    <option value="180">3 Minutes</option>
+                    <option value="300">5 Minutes</option>
+                </select>
+            </div>
+            
+            <button id="startButton" class="w-full py-3 bg-accent-teal text-gray-900 font-bold rounded-xl shadow-md hover:bg-teal-300 transition transform hover:scale-[1.01]" onclick="startGame()">
+                Start Drill
+            </button>
+        </div>
+
+        <!-- Game Area -->
+        <div id="gameArea" class="hidden">
+            <div class="bg-accent-blue text-white p-8 rounded-3xl shadow-xl mb-8">
+                <p class="text-lg mb-2 opacity-90">What is the answer?</p>
+                <div class="text-6xl md:text-7xl font-black" id="questionText">
+                    ?
+                </div>
+            </div>
+
+            <!-- Answer Options (6 buttons) -->
+            <div id="optionsContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <!-- Buttons will be dynamically added here -->
+            </div>
+            
+            <button id="stopButton" class="mt-8 w-full py-3 bg-accent-red text-white font-bold rounded-xl shadow-md hover:bg-red-600 transition transform hover:scale-[1.01]" onclick="stopGame()">
+                End Drill Early
+            </button>
+        </div>
+        
+        <!-- Modal for Results and Messages -->
+        <div id="messageModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden flex items-center justify-center p-4 z-50" onclick="hideModal()">
+            <div class="bg-card-dark p-8 rounded-xl shadow-2xl max-w-sm w-full text-center transform transition-all duration-300 scale-95 border border-gray-600" onclick="event.stopPropagation()">
+                <h3 id="modalTitle" class="text-3xl font-extrabold mb-4 text-accent-teal">Drill Finished!</h3>
+                <p id="modalMessage" class="text-lg text-gray-300 mb-6">You scored 0 points.</p>
+                <button class="py-3 px-6 bg-accent-green text-gray-900 font-bold rounded-lg hover:bg-green-400 transition" onclick="hideModal()">
+                    Start New Drill
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Main Game Logic and Audio Functions -->
+    <script>
+        // --- State Variables ---
+        let score = 0;
+        let timeRemaining = 0; // in seconds
+        let timerInterval = null;
+        let currentQuestion = { factor1: 0, factor2: 0, answer: 0 };
+        let isGameRunning = false;
+
+        // --- DOM Elements ---
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const questionText = document.getElementById('questionText');
+        const optionsContainer = document.getElementById('optionsContainer');
+        const settingsContainer = document.getElementById('settingsContainer');
+        const gameArea = document.getElementById('gameArea');
+        const tableNumberInput = document.getElementById('tableNumber');
+        const tableLabel = document.getElementById('tableLabel');
+        const timeLimitSelect = document.getElementById('timeLimit');
+        const messageModal = document.getElementById('messageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        
+        // --- Audio Setup (Tone.js) ---
+        let correctSynth, wrongSynth;
+
+        function setupAudio() {
+            // Updated FM chime: Volume is now -10 (up from -20) and decay/release are slightly longer
+            // to match the duration and loudness of the wrongSynth thump.
+            correctSynth = new Tone.FMSynth({
+                modulationIndex: 5,
+                // Adjusted envelope for slightly longer, softer decay
+                envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.2 }, 
+                modulation: { type: "sine" },
+                volume: -10 // MATCHES wrongSynth volume
+            }).toDestination();
+            
+            // Semi-bad sound (subtle, low thump/drum) - unchanged
+            wrongSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octaves: 1,
+                envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 0.01 },
+                volume: -10 
+            }).toDestination();
+        }
+
+        function playCorrectSound() {
+            Tone.start(); // Ensure audio context is started (required for first interaction)
+            // Duration changed to "8n" to MATCH wrongSynth duration
+            correctSynth.triggerAttackRelease("G5", "8n"); 
+        }
+
+        function playWrongSound() {
+            Tone.start(); // Ensure audio context is started
+            // Duration is "8n"
+            wrongSynth.triggerAttackRelease("C2", "8n"); 
+        }
+
+        // Helper to get selected drill type
+        function getDrillType() {
+            return document.querySelector('input[name="drillType"]:checked').value;
+        }
+
+        // Updates the label next to the number input based on drill type
+        function updateTableLabel() {
+            const type = getDrillType();
+            if (type === 'range') {
+                tableLabel.textContent = 'Max Table (N):';
+                tableNumberInput.value = Math.min(50, tableNumberInput.value || 20); // Default 20, max 50
+            } else {
+                tableLabel.textContent = 'Focus Table (N):';
+                tableNumberInput.value = tableNumberInput.value || 12; // Default 12
+            }
+        }
+
+
+        // --- Game Functions ---
+
+        function updateDisplay() {
+            scoreDisplay.textContent = score;
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            // Convert selected time (string) to integer seconds
+            timeRemaining = parseInt(timeLimitSelect.value);
+
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateDisplay();
+
+                if (timeRemaining <= 0) {
+                    stopGame();
+                    showModal("Time's Up!", `Great effort! You scored ${score} points.`);
+                }
+            }, 1000);
+        }
+
+        function generateQuestion() {
+            // Read settings
+            const drillType = getDrillType();
+            let tableSetting = parseInt(tableNumberInput.value) || 20;
+            
+            // Apply bounds check
+            if (tableSetting < 1) tableSetting = 1;
+            if (tableSetting > 50) tableSetting = 50;
+
+            let f1, f2;
+
+            if (drillType === 'single') {
+                // SINGLE TABLE FOCUS: f1 is fixed, f2 is random up to f1
+                f1 = tableSetting;
+                f2 = Math.floor(Math.random() * tableSetting) + 1;
+            } else { // 'range'
+                // RANGE DRILL (1 to N): f1 is random (the table), f2 is random (the multiplier)
+                // Both factors are random between 1 and the tableSetting (N).
+                const maxRange = tableSetting;
+                f1 = Math.floor(Math.random() * maxRange) + 1;
+                f2 = Math.floor(Math.random() * maxRange) + 1;
+            }
+            
+            const answer = f1 * f2;
+
+            currentQuestion = { f1, f2, answer };
+            
+            // Generate the options
+            generateOptions(answer);
+            
+            // Update question display
+            questionText.textContent = `${f1} × ${f2}`;
+        }
+
+        function generateOptions(correctAnswer) {
+            const options = new Set();
+            options.add(correctAnswer);
+            
+            // Strategy for 5 incorrect answers:
+            const strategies = [
+                () => correctAnswer + currentQuestion.f1,
+                () => correctAnswer - currentQuestion.f2,
+                () => correctAnswer + 1,
+                () => correctAnswer - 1,
+                () => correctAnswer + 10,
+                () => correctAnswer - 10,
+                // Add a completely random nearby answer
+                () => correctAnswer + Math.floor(Math.random() * 20) - 10
+            ];
+
+            // Try to generate 5 unique, plausible incorrect answers
+            while (options.size < 6) {
+                const strategyIndex = Math.floor(Math.random() * strategies.length);
+                let wrongAnswer = strategies[strategyIndex]();
+                
+                // Ensure answer is positive and not the correct answer
+                if (wrongAnswer > 0 && wrongAnswer !== correctAnswer) {
+                    options.add(wrongAnswer);
+                }
+            }
+
+            const optionsArray = Array.from(options);
+            // Shuffle the options array
+            optionsArray.sort(() => Math.random() - 0.5);
+
+            renderOptions(optionsArray, correctAnswer);
+        }
+
+        function renderOptions(optionsArray, correctAnswer) {
+            optionsContainer.innerHTML = ''; // Clear previous buttons
+            optionsArray.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                // Updated class for Dark Mode theme
+                button.className = 'py-4 bg-gray-700 text-gray-100 text-xl font-bold rounded-xl shadow-lg border-b-4 border-gray-600 hover:bg-gray-600 transition transform active:scale-[0.98]';
+                
+                // Attach event listener with the answer value
+                button.onclick = () => handleAnswerClick(option, correctAnswer, button);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function handleAnswerClick(selectedAnswer, correctAnswer, buttonElement) {
+            if (!isGameRunning) return;
+
+            if (selectedAnswer === correctAnswer) {
+                // Correct Answer
+                playCorrectSound(); // Play pleasant sound
+                score++;
+                buttonElement.classList.remove('bg-gray-700', 'border-gray-600');
+                buttonElement.classList.add('bg-accent-green', 'text-gray-900', 'border-green-800');
+                
+                // Wait briefly, then move to the next question
+                setTimeout(() => {
+                    generateQuestion();
+                    updateDisplay();
+                }, 300);
+            } else {
+                // Incorrect Answer
+                playWrongSound(); // Play subtle, semi-bad sound
+                timeRemaining = Math.max(0, timeRemaining - 3); // Deduct 3 seconds for wrong answer
+                buttonElement.classList.remove('bg-gray-700', 'border-gray-600');
+                buttonElement.classList.add('bg-accent-red', 'text-white', 'border-red-600');
+                
+                // Highlight the correct answer temporarily
+                Array.from(optionsContainer.children).forEach(btn => {
+                    if (parseInt(btn.textContent) === correctAnswer) {
+                        // Use a bright highlight color
+                        btn.classList.add('bg-yellow-400', 'text-gray-900', 'border-yellow-600');
+                    }
+                });
+
+                // Wait briefly, then move to the next question
+                setTimeout(() => {
+                    generateQuestion();
+                    updateDisplay();
+                }, 800);
+            }
+        }
+
+        function startGame() {
+            if (isGameRunning) return;
+
+            // Reset state
+            score = 0;
+            isGameRunning = true;
+            settingsContainer.classList.add('hidden');
+            gameArea.classList.remove('hidden');
+
+            // Lock settings during game
+            tableNumberInput.disabled = true;
+            timeLimitSelect.disabled = true;
+            document.getElementById('drillTypeRange').disabled = true;
+            document.getElementById('drillTypeSingle').disabled = true;
+
+            updateDisplay();
+            generateQuestion();
+            startTimer();
+        }
+
+        function stopGame() {
+            if (!isGameRunning) return;
+            isGameRunning = false;
+            
+            // Stop timer
+            if (timerInterval) clearInterval(timerInterval);
+
+            // Show final score
+            showModal("Drill Complete!", `Your final score is ${score} points!`);
+
+            // Reset UI to settings view
+            settingsContainer.classList.remove('hidden');
+            gameArea.classList.add('hidden');
+            tableNumberInput.disabled = false;
+            timeLimitSelect.disabled = false;
+            document.getElementById('drillTypeRange').disabled = false;
+            document.getElementById('drillTypeSingle').disabled = false;
+            timerDisplay.textContent = '00:00'; // Reset timer display
+        }
+        
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            messageModal.classList.remove('hidden');
+        }
+
+        function hideModal() {
+            modalTitle.textContent = "Drill Finished!";
+            modalMessage.textContent = "You scored 0 points.";
+            messageModal.classList.add('hidden');
+        }
+
+
+        // --- Initialization ---
+        window.onload = function() {
+            setupAudio(); // Initialize the audio synthesizers
+            updateDisplay(); // Initialize timer and score to 0/--:--
+            updateTableLabel(); // Initialize the label correctly
+        };
+    </script>
+</body>
+</html>
